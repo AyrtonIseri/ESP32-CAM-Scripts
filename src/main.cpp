@@ -1,22 +1,22 @@
 #include <Arduino.h>
 #include <WiFiMulti.h>
+#include <ESP_WiFiManager.h>
 
 #define WIFI_SSID "network"
 #define WIFI_PASSWORD "password"
 
- WiFiMulti wifimulti;
+String AP_SSID = "AutoConnectAP";
+String AP_PASS = "password";
 
 void setup() {
   Serial.begin(115200);
 
-  wifimulti.addAP(WIFI_SSID, WIFI_PASSWORD);
-  
-  while (wifimulti.run() != WL_CONNECTED) {
-    Serial.println("Connection couldn't be established. Retrying... ");
-    delay(1000);
-  }
+  ESP_WiFiManager ESP_wifiManager;
+  if (!ESP_wifiManager.autoConnect(AP_SSID.c_str(), AP_PASS.c_str()))
+    Serial.println(F("Not connected to WiFi but continuing anyway."));
+  else
+    Serial.println(F("WiFi connected...yeey :)"));
 
-  Serial.println("Connected!");
 }
 
 void loop() {
