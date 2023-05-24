@@ -7,9 +7,9 @@
 #include <HTTPClient.h>
 #include "esp_camera.h"
 
-#define OBJECT_FILENAME "photo.jpeg"
+#define OBJECT_FILENAME "new_photo.png"
 #define MQTT_BUF_SIZE 7168
-#define SLEEP_TIME 10000
+#define SLEEP_TIME 20000
 
 String AP_SSID = "AutoConnectAP";
 String AP_PASS = "password";
@@ -49,19 +49,22 @@ void connectWifi() {
     Serial.println(F("WiFi connected...yeey :)"));
 }
 
-void uploadFileToS3(String uploadUrl) {
+void uploadFileToS3(String uploadUrl, camera_fb_t* fb) {
   HTTPClient http;
-  http.begin(net, uploadUrl);
+  http.begin(uploadUrl);
 
   Serial.print("payload size: ");
   Serial.print(fb->len);
   Serial.println(".");
 
-  int result = http.POST(fb->buf, fb->len);
+  int result = http.PUT(fb->buf, fb->len);
   Serial.print("The result from the post operation was: ");
   Serial.print(result);
   Serial.println(".");
   
+  Serial.print("Request response content: ");
+  Serial.println(http.getString());
+
   http.end();
 }
 
@@ -69,11 +72,17 @@ void messageHandler(String &topic, String &payload) {
   RECEIVED_POST_URL = true;
   Serial.println("Credential Received");
 
-  StaticJsonDocument<200> url;
-  deserializeJson(url, payload);
-  
-  uploadFileToS3(url["url"]);
+  StaticJsonDocument<2048> url;
+  DeserializationError error = deserializeJson(url, payload);
 
+  if (error) {
+    Serial.print("Error parsing JSON: ");
+    Serial.println(error.c_str());
+    return;
+  }
+
+  uploadFileToS3(url["url"], fb);
+  
   esp_camera_fb_return(fb);
 }
 
@@ -170,12 +179,17 @@ void setup() {
   configCamera();
 }
 
+void deep_sleep() {
+  delay(SLEEP_TIME);
+}
+
 void loop() {
   if (WiFi.status() == WL_CONNECTED) {
     if (!client.connected())
       connectAWS();
 
     if (millis() > millisNow + SLEEP_TIME) {
+      
       fb = esp_camera_fb_get();
 
       if (!fb) {
@@ -183,9 +197,9 @@ void loop() {
         delay(1000);
         return;
       }
-
+      
       publishURLRequest();
-
+      
       while (!RECEIVED_POST_URL)
         client.loop();
 
@@ -198,9 +212,5 @@ void loop() {
     Serial.println("Lost communication. Reconnecting...");
   }
   client.loop();
-  // deep_sleep();
-}
-
-void deep_sleep() {
-  delay(SLEEP_TIME);
+  deep_sleep();
 }
