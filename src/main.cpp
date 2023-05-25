@@ -48,7 +48,7 @@ void connectWifi() {
   if (!ESP_wifiManager.autoConnect(AP_SSID.c_str(), AP_PASS.c_str()))
     Serial.println(F("Not connected to WiFi but continuing anyway."));
   else
-    Serial.println(F("WiFi connected...yeey :)"));
+    Serial.println(F("\nWiFi connected...yeey :)\n"));
 }
 
 void uploadFileToS3(String uploadUrl, camera_fb_t* fb) {
@@ -64,7 +64,7 @@ void uploadFileToS3(String uploadUrl, camera_fb_t* fb) {
   Serial.print(result);
   Serial.println(".");
   
-  Serial.print("Request response content: ");
+  Serial.print("Request response content: \n");
   Serial.println(http.getString());
 
   http.end();
@@ -72,7 +72,6 @@ void uploadFileToS3(String uploadUrl, camera_fb_t* fb) {
 
 void messageHandler(String &topic, String &payload) {
   RECEIVED_POST_URL = true;
-  Serial.println("Credential Received");
 
   StaticJsonDocument<2048> url;
   DeserializationError error = deserializeJson(url, payload);
@@ -111,12 +110,11 @@ void connectAWS() {
   // Subscribe to a topic
   client.subscribe(AWS_IOT_SUBSCRIBE_TOPIC);
 
-  Serial.println("AWS IoT Connected!");
+  Serial.println("\nAWS IoT Connected!\n");
 }
 
 void publishURLRequest(String objName) {
   StaticJsonDocument<200> doc;
-  doc["time"] = millis();
   doc["client"] = CLIENT;
   doc["topic"] = AWS_IOT_SUBSCRIBE_TOPIC;
   doc["key"] = objName;
@@ -124,8 +122,8 @@ void publishURLRequest(String objName) {
   char jsonBuffer[512];
   serializeJson(doc, jsonBuffer);
 
-  Serial.print("message being send: ");
-  Serial.println(jsonBuffer);
+  Serial.print("PUT request to upload the following file: ");
+  Serial.println(objName);
 
   client.publish(AWS_IOT_PUBLISH_TOPIC, jsonBuffer);
 }
@@ -175,14 +173,14 @@ void configCamera() {
 }
 
 void syncTime() {
-  configTime(GMT_TIMEZONE_OFFSET * 3600, 0, "0.pool.ntp.org");
+  configTime(GMT_TIMEZONE_OFFSET * 3600, 0, "pool.ntp.org");
   Serial.print("Setting up adequate time");
 
   while (!time(nullptr)) {
     delay(500);
     Serial.print(".");
   }
-  Serial.println("\nTime successfully setted!");
+  Serial.println("\nTime successfully setted!\n");
 }
 
 void setup() {
@@ -193,15 +191,21 @@ void setup() {
   configCamera();
 }
 
+unsigned long getTime() {
+  time_t now;
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    Serial.println("Failed to obtain time");
+    return(0);
+  }
+  time(&now);
+  return now;
+}
+
 String getObjectName() {
-  time_t currTimestamp = time(nullptr);
-  Serial.print("Current time: ");
-  Serial.print(currTimestamp);
-  Serial.println(".");
+  time_t currTimestamp = getTime();
   String strTimestamp = String(currTimestamp);
-  Serial.print("Current time: ");
-  Serial.print(strTimestamp);
-  Serial.println(".");
+
   String objName = THINGNAME + String("-") + strTimestamp + String(".png");
 
   return objName;
