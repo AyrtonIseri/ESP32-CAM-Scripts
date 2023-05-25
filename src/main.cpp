@@ -5,11 +5,13 @@
 #include <MQTTClient.h>
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
+#include <TimeLib.h>
 #include "esp_camera.h"
 
-#define OBJECT_FILENAME "new_photo.png"
 #define MQTT_BUF_SIZE 7168
-#define SLEEP_TIME 20000
+#define SLEEP_TIME 60000
+
+#define GMT_TIMEZONE_OFFSET -3
 
 String AP_SSID = "AutoConnectAP";
 String AP_PASS = "password";
@@ -112,12 +114,12 @@ void connectAWS() {
   Serial.println("AWS IoT Connected!");
 }
 
-void publishURLRequest() {
+void publishURLRequest(String objName) {
   StaticJsonDocument<200> doc;
   doc["time"] = millis();
   doc["client"] = CLIENT;
   doc["topic"] = AWS_IOT_SUBSCRIBE_TOPIC;
-  doc["key"] = OBJECT_FILENAME;
+  doc["key"] = objName;
 
   char jsonBuffer[512];
   serializeJson(doc, jsonBuffer);
@@ -172,11 +174,37 @@ void configCamera() {
   sensor_t * s = esp_camera_sensor_get();
 }
 
+void syncTime() {
+  configTime(GMT_TIMEZONE_OFFSET * 3600, 0, "0.pool.ntp.org");
+  Serial.print("Setting up adequate time");
+
+  while (!time(nullptr)) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nTime successfully setted!");
+}
+
 void setup() {
   Serial.begin(115200);
   connectWifi();
   connectAWS();
+  syncTime();
   configCamera();
+}
+
+String getObjectName() {
+  time_t currTimestamp = time(nullptr);
+  Serial.print("Current time: ");
+  Serial.print(currTimestamp);
+  Serial.println(".");
+  String strTimestamp = String(currTimestamp);
+  Serial.print("Current time: ");
+  Serial.print(strTimestamp);
+  Serial.println(".");
+  String objName = THINGNAME + String("-") + strTimestamp + String(".png");
+
+  return objName;
 }
 
 void deep_sleep() {
@@ -190,6 +218,7 @@ void loop() {
 
     if (millis() > millisNow + SLEEP_TIME) {
       
+      String objName = getObjectName();
       fb = esp_camera_fb_get();
 
       if (!fb) {
@@ -198,7 +227,7 @@ void loop() {
         return;
       }
       
-      publishURLRequest();
+      publishURLRequest(objName);
       
       while (!RECEIVED_POST_URL)
         client.loop();
