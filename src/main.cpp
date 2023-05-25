@@ -8,12 +8,14 @@
 #include <TimeLib.h>
 #include "esp_camera.h"
 
-#define MQTT_BUF_SIZE 7168
-#define SLEEP_TIME 60000
+//Sleep time config stats
+#define SLEEP_TIME 120000
 
+//Timezone config stats
 #define GMT_TIMEZONE_OFFSET -3
 
-String AP_SSID = "AutoConnectAP";
+// AP config stats
+String AP_SSID = "AutoConnectAP" + String(THINGNAME);
 String AP_PASS = "password";
 
 // CAMERA_MODEL_AI_THINKER
@@ -35,12 +37,14 @@ String AP_PASS = "password";
 #define HREF_GPIO_NUM     23
 #define PCLK_GPIO_NUM     22
 
+// MQTT Config stats
+#define MQTT_BUF_SIZE 7168
+#define MQTT_KEEP_ALIVE_TIME 120 //In seconds
+
 WiFiClientSecure net = WiFiClientSecure();
 MQTTClient client = MQTTClient(MQTT_BUF_SIZE);
 
 bool RECEIVED_POST_URL = false;
-unsigned long millisNow = -SLEEP_TIME;
-
 camera_fb_t * fb;
 
 void connectWifi() {
@@ -93,6 +97,7 @@ void connectAWS() {
   net.setPrivateKey(AWS_CERT_PRIVATE);
 
   client.begin(AWS_IOT_ENDPOINT, 8883, net);
+  client.setKeepAlive(MQTT_KEEP_ALIVE_TIME);
   client.onMessage(messageHandler);
 
   Serial.print("Connecting to AWS IOT");
@@ -125,7 +130,18 @@ void publishURLRequest(String objName) {
   Serial.print("PUT request to upload the following file: ");
   Serial.println(objName);
 
-  client.publish(AWS_IOT_PUBLISH_TOPIC, jsonBuffer);
+  if (WiFi.status() != WL_CONNECTED)
+    connectWifi();
+
+  while(!client.publish(AWS_IOT_PUBLISH_TOPIC, jsonBuffer)) {
+    Serial.println("Couldn't publish the request, trying again");
+    delay(1000);
+    client.loop();
+    if (!client.connected())
+      connectAWS();
+  }
+
+  Serial.print("MQTT message successfully sent.");
 }
 
 void configCamera() {
@@ -220,30 +236,28 @@ void loop() {
     if (!client.connected())
       connectAWS();
 
-    if (millis() > millisNow + SLEEP_TIME) {
-      
-      String objName = getObjectName();
-      fb = esp_camera_fb_get();
+    String objName = getObjectName();
+    fb = esp_camera_fb_get();
 
-      if (!fb) {
-        Serial.println("Camera capture failed");
-        delay(1000);
-        return;
-      }
-      
-      publishURLRequest(objName);
-      
-      while (!RECEIVED_POST_URL)
-        client.loop();
-
-      RECEIVED_POST_URL = false;
-      millisNow = millis();
+    if (!fb) {
+      Serial.println("Camera capture failed");
+      delay(1000);
+      return;
     }
+    
+    publishURLRequest(objName);
+    
+    while (!RECEIVED_POST_URL)
+      client.loop();
+
+    RECEIVED_POST_URL = false;
+
   }
 
   else {
     Serial.println("Lost communication. Reconnecting...");
   }
+
   client.loop();
   deep_sleep();
 }
