@@ -9,7 +9,9 @@
 #include "esp_camera.h"
 
 //Sleep time config stats
-#define SLEEP_TIME 120000
+#define SLEEP_TIME 10000 //milliseconds
+#define REBOOT_TIME_MARGIN 120 //seconds
+#define REBOOT_SAFETY_MARGIN 2 //seconds
 
 //Timezone config stats
 #define GMT_TIMEZONE_OFFSET -3
@@ -89,9 +91,11 @@ void messageHandler(String &topic, String &payload) {
   uploadFileToS3(url["url"], fb);
   
   esp_camera_fb_return(fb);
+  delay(100);
+  esp_camera_fb_return(fb);
 }
 
-void connectAWS() {  
+void connectAWS() {
   net.setCACert(AWS_CERT_CA);
   net.setCertificate(AWS_CERT_CRT);
   net.setPrivateKey(AWS_CERT_PRIVATE);
@@ -186,6 +190,16 @@ void configCamera() {
     ESP.restart();
   }
   sensor_t * s = esp_camera_sensor_get();
+
+  Serial.print("Setting up camera device");
+  for (int i = 0; i < 3; i ++) {
+    fb = esp_camera_fb_get();
+    delay(1000);
+    esp_camera_fb_return(fb);
+    Serial.print(".");
+  }
+
+  Serial.println(" Camera successfully configured");
 }
 
 void syncTime() {
@@ -197,6 +211,51 @@ void syncTime() {
     Serial.print(".");
   }
   Serial.println("\nTime successfully setted!\n");
+}
+
+unsigned long getCurrentHour() {
+  struct tm timeinfo;
+
+  if(!getLocalTime(&timeinfo)){
+    Serial.println("Failed to obtain time");
+    return 0;
+  }
+
+  char timeHour[3];
+  char timeMinute[3];
+  char timeSeconds[3];
+  
+  strftime(timeHour,3, "%H", &timeinfo);
+  strftime(timeMinute,3, "%M", &timeinfo);
+  strftime(timeSeconds,3, "%S", &timeinfo);
+
+  unsigned long currentHour = atoi(timeHour) * 3600 + atoi(timeMinute) * 60 + atoi(timeSeconds);
+
+  return currentHour;
+}
+
+void waitAndReboot(long timeToMonitor) {
+  Serial.println("Soon, the device will restart! \n");
+  unsigned long currentHour = getCurrentHour();
+
+  while (timeToMonitor - currentHour > REBOOT_SAFETY_MARGIN)
+    currentHour = getCurrentHour();
+
+  ESP.restart();
+}
+
+void verifyReboot() {
+  unsigned long currentHour = getCurrentHour();
+
+  for (int i = 0; i < REBOOTSIZE; i++) {
+    long time = REBOOT_TIMES[i] * 3600;
+
+    if (currentHour <= time)
+      if (time - currentHour <= int(SLEEP_TIME/1000) + REBOOT_TIME_MARGIN)
+        waitAndReboot(time);
+
+  }
+
 }
 
 void setup() {
@@ -235,6 +294,8 @@ void loop() {
   if (WiFi.status() == WL_CONNECTED) {
     if (!client.connected())
       connectAWS();
+
+    verifyReboot();
 
     String objName = getObjectName();
     fb = esp_camera_fb_get();
