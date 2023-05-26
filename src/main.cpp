@@ -9,7 +9,6 @@
 #include "esp_camera.h"
 
 //Sleep time config stats
-#define SLEEP_TIME 10000 //milliseconds
 #define REBOOT_TIME_MARGIN 120 //seconds
 #define REBOOT_SAFETY_MARGIN 2 //seconds
 #define WORKING_HOUR_SLEEP 1800000 //seconds
