@@ -12,6 +12,7 @@
 #define SLEEP_TIME 10000 //milliseconds
 #define REBOOT_TIME_MARGIN 120 //seconds
 #define REBOOT_SAFETY_MARGIN 2 //seconds
+#define WORKING_HOUR_SLEEP 1800000 //seconds
 
 //Timezone config stats
 #define GMT_TIMEZONE_OFFSET -3
@@ -258,6 +259,14 @@ void verifyReboot() {
 
 }
 
+void verifyWorkingHours() {
+  unsigned long currentHour = getCurrentHour();
+  if (currentHour < WORKING_HOURS[0] * 3600 || currentHour > WORKING_HOURS[1] * 3600) {
+    Serial.println("Current Period is not a working hour. Going to sleep");
+    delay(WORKING_HOUR_SLEEP);
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   connectWifi();
@@ -292,10 +301,12 @@ void deep_sleep() {
 
 void loop() {
   if (WiFi.status() == WL_CONNECTED) {
+    verifyWorkingHours();
+  
+    verifyReboot();
+
     if (!client.connected())
       connectAWS();
-
-    verifyReboot();
 
     String objName = getObjectName();
     fb = esp_camera_fb_get();
