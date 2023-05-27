@@ -310,13 +310,18 @@ String getObjectName() {
 }
 
 void deep_sleep(long time_to_sleep) {
-  delay(time_to_sleep);
+  esp_sleep_enable_timer_wakeup(time_to_sleep);
+
+  Serial.println("Setup ESP32 to sleep for " + String(time_to_sleep / MICRO_TO_SECONDS) + " Seconds");
+  Serial.flush();
+
+  esp_deep_sleep_start();
 }
 
 void loop() {
   if (WiFi.status() == WL_CONNECTED) {
     verifyWorkingHours();
-  
+
     verifyReboot();
 
     if (!client.connected())
