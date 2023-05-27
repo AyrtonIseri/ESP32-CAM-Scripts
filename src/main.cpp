@@ -14,6 +14,7 @@
 #define WORKING_HOUR_SLEEP 1800000 //seconds
 
 #define MICRO_TO_SECONDS 1000000
+#define MICRO_TO_MILLI 1000
 
 //Timezone config stats
 #define GMT_TIMEZONE_OFFSET -3
@@ -51,6 +52,14 @@ MQTTClient client = MQTTClient(MQTT_BUF_SIZE);
 bool RECEIVED_POST_URL = false;
 camera_fb_t * fb;
 
+void deep_sleep(long time_to_sleep) {
+  esp_sleep_enable_timer_wakeup(time_to_sleep);
+
+  Serial.println("Setup ESP32 to sleep for " + String(time_to_sleep / MICRO_TO_SECONDS) + " Seconds");
+  Serial.flush();
+
+  esp_deep_sleep_start();
+}
 
 void syncTime() {
   configTime(GMT_TIMEZONE_OFFSET * 3600, 0, "pool.ntp.org");
@@ -103,7 +112,7 @@ void verifyReboot() {
     long time = REBOOT_TIMES[i] * 3600;
 
     if (currentHour <= time)
-      if (time - currentHour <= int(SLEEP_TIME/1000) + REBOOT_TIME_MARGIN)
+      if (time - currentHour <= SLEEP_TIME + REBOOT_TIME_MARGIN)
         waitAndReboot(time);
 
   }
@@ -113,6 +122,10 @@ void verifyReboot() {
 void verifyWorkingHours() {
   unsigned long currentHour = getCurrentHour();
   if (currentHour < WORKING_HOURS[0] * 3600 || currentHour > WORKING_HOURS[1] * 3600) {
+    
+    if (WORKING_HOURS[0]*3600 - currentHour < WORKING_HOUR_SLEEP)
+      waitAndReboot(WORKING_HOURS[0] * 3600);
+
     Serial.println("Current Period is not a working hour. Going to sleep");
     deep_sleep(WORKING_HOUR_SLEEP * MICRO_TO_SECONDS);
   }
@@ -309,16 +322,8 @@ String getObjectName() {
   return objName;
 }
 
-void deep_sleep(long time_to_sleep) {
-  esp_sleep_enable_timer_wakeup(time_to_sleep);
-
-  Serial.println("Setup ESP32 to sleep for " + String(time_to_sleep / MICRO_TO_SECONDS) + " Seconds");
-  Serial.flush();
-
-  esp_deep_sleep_start();
-}
-
 void loop() {
+  long millisnow = millis();
   if (WiFi.status() == WL_CONNECTED) {
     verifyWorkingHours();
 
@@ -349,6 +354,7 @@ void loop() {
     Serial.println("Lost communication. Reconnecting...");
   }
 
-  client.loop();
-  deep_sleep(SLEEP_TIME * MICRO_TO_SECONDS);
+  long timeDelay = millis() - millisnow;
+
+  deep_sleep(SLEEP_TIME * MICRO_TO_SECONDS - timeDelay * MICRO_TO_MILLI);
 }
