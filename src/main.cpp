@@ -49,6 +49,74 @@ MQTTClient client = MQTTClient(MQTT_BUF_SIZE);
 bool RECEIVED_POST_URL = false;
 camera_fb_t * fb;
 
+
+void syncTime() {
+  configTime(GMT_TIMEZONE_OFFSET * 3600, 0, "pool.ntp.org");
+  Serial.print("Setting up adequate time");
+
+  while (!time(nullptr)) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nTime successfully setted!\n");
+}
+
+unsigned long getCurrentHour() {
+  struct tm timeinfo;
+
+  if(!getLocalTime(&timeinfo)){
+    Serial.println("Failed to obtain time");
+    ESP.restart();
+  }
+
+  char timeHour[3];
+  char timeMinute[3];
+  char timeSeconds[3];
+  
+  strftime(timeHour,3, "%H", &timeinfo);
+  strftime(timeMinute,3, "%M", &timeinfo);
+  strftime(timeSeconds,3, "%S", &timeinfo);
+
+  unsigned long currentHour = atoi(timeHour) * 3600 + atoi(timeMinute) * 60 + atoi(timeSeconds);
+
+  return currentHour;
+}
+
+void waitAndReboot(long timeToMonitor) {
+  Serial.println("Soon, the device will restart! \n");
+  unsigned long currentHour = getCurrentHour();
+
+  while (timeToMonitor - currentHour > REBOOT_SAFETY_MARGIN)
+    currentHour = getCurrentHour();
+
+  ESP.restart();
+}
+
+void verifyReboot() {
+  unsigned long currentHour = getCurrentHour();
+
+  int REBOOTSIZE = sizeof(REBOOT_TIMES) / sizeof(REBOOT_TIMES[0]);
+
+  for (int i = 0; i < REBOOTSIZE; i++) {
+    long time = REBOOT_TIMES[i] * 3600;
+
+    if (currentHour <= time)
+      if (time - currentHour <= int(SLEEP_TIME/1000) + REBOOT_TIME_MARGIN)
+        waitAndReboot(time);
+
+  }
+
+}
+
+void verifyWorkingHours() {
+  unsigned long currentHour = getCurrentHour();
+  if (currentHour < WORKING_HOURS[0] * 3600 || currentHour > WORKING_HOURS[1] * 3600) {
+    Serial.println("Current Period is not a working hour. Going to sleep");
+    delay(WORKING_HOUR_SLEEP);
+  }
+}
+
+
 void connectWifi() {
   ESP_WiFiManager ESP_wifiManager;
   if (!ESP_wifiManager.autoConnect(AP_SSID.c_str(), AP_PASS.c_str()))
@@ -66,6 +134,16 @@ void uploadFileToS3(String uploadUrl, camera_fb_t* fb) {
   Serial.println(".");
 
   int result = http.PUT(fb->buf, fb->len);
+  int tries = 1;
+
+  while (result < 0){
+    delay(1000);
+    result = http.PUT(fb->buf, fb->len);
+    tries += 1;
+    if (tries > 5)
+      ESP.restart();
+  }
+
   Serial.print("The result from the post operation was: ");
   Serial.print(result);
   Serial.println(".");
@@ -201,71 +279,6 @@ void configCamera() {
 
   Serial.println(" Camera successfully configured");
 }
-
-void syncTime() {
-  configTime(GMT_TIMEZONE_OFFSET * 3600, 0, "pool.ntp.org");
-  Serial.print("Setting up adequate time");
-
-  while (!time(nullptr)) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\nTime successfully setted!\n");
-}
-
-unsigned long getCurrentHour() {
-  struct tm timeinfo;
-
-  if(!getLocalTime(&timeinfo)){
-    Serial.println("Failed to obtain time");
-    return 0;
-  }
-
-  char timeHour[3];
-  char timeMinute[3];
-  char timeSeconds[3];
-  
-  strftime(timeHour,3, "%H", &timeinfo);
-  strftime(timeMinute,3, "%M", &timeinfo);
-  strftime(timeSeconds,3, "%S", &timeinfo);
-
-  unsigned long currentHour = atoi(timeHour) * 3600 + atoi(timeMinute) * 60 + atoi(timeSeconds);
-
-  return currentHour;
-}
-
-void waitAndReboot(long timeToMonitor) {
-  Serial.println("Soon, the device will restart! \n");
-  unsigned long currentHour = getCurrentHour();
-
-  while (timeToMonitor - currentHour > REBOOT_SAFETY_MARGIN)
-    currentHour = getCurrentHour();
-
-  ESP.restart();
-}
-
-void verifyReboot() {
-  unsigned long currentHour = getCurrentHour();
-
-  for (int i = 0; i < REBOOTSIZE; i++) {
-    long time = REBOOT_TIMES[i] * 3600;
-
-    if (currentHour <= time)
-      if (time - currentHour <= int(SLEEP_TIME/1000) + REBOOT_TIME_MARGIN)
-        waitAndReboot(time);
-
-  }
-
-}
-
-void verifyWorkingHours() {
-  unsigned long currentHour = getCurrentHour();
-  if (currentHour < WORKING_HOURS[0] * 3600 || currentHour > WORKING_HOURS[1] * 3600) {
-    Serial.println("Current Period is not a working hour. Going to sleep");
-    delay(WORKING_HOUR_SLEEP);
-  }
-}
-
 void setup() {
   Serial.begin(115200);
   connectWifi();
@@ -279,7 +292,7 @@ unsigned long getTime() {
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo)) {
     Serial.println("Failed to obtain time");
-    return(0);
+    ESP.restart();
   }
   time(&now);
   return now;
