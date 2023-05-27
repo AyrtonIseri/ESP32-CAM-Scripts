@@ -13,6 +13,8 @@
 #define REBOOT_SAFETY_MARGIN 2 //seconds
 #define WORKING_HOUR_SLEEP 1800000 //seconds
 
+#define MICRO_TO_SECONDS 1000000
+
 //Timezone config stats
 #define GMT_TIMEZONE_OFFSET -3
 
@@ -112,7 +114,7 @@ void verifyWorkingHours() {
   unsigned long currentHour = getCurrentHour();
   if (currentHour < WORKING_HOURS[0] * 3600 || currentHour > WORKING_HOURS[1] * 3600) {
     Serial.println("Current Period is not a working hour. Going to sleep");
-    delay(WORKING_HOUR_SLEEP);
+    deep_sleep(WORKING_HOUR_SLEEP * MICRO_TO_SECONDS);
   }
 }
 
@@ -307,8 +309,8 @@ String getObjectName() {
   return objName;
 }
 
-void deep_sleep() {
-  delay(SLEEP_TIME);
+void deep_sleep(long time_to_sleep) {
+  delay(time_to_sleep);
 }
 
 void loop() {
@@ -343,5 +345,5 @@ void loop() {
   }
 
   client.loop();
-  deep_sleep();
+  deep_sleep(SLEEP_TIME * MICRO_TO_SECONDS);
 }
