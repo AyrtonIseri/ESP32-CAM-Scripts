@@ -2,6 +2,9 @@
 #include <secrets.h>
 #include "esp_camera.h"
 
+#ifndef CAMERA_H
+#define CAMERA_H
+
 // CAMERA_MODEL_AI_THINKER
 #define PWDN_GPIO_NUM     32
 #define RESET_GPIO_NUM    -1
@@ -21,9 +24,18 @@
 #define HREF_GPIO_NUM     23
 #define PCLK_GPIO_NUM     22
 
-camera_fb_t * fb;
+void printHeap() {
+  Serial.print("Current Heap free space: ");
+  Serial.println(ESP.getFreeHeap());
+}
 
-void configCamera(camera_fb_t * fb) {
+void espRestart() {
+  delay(1000);
+  Serial.flush();
+  ESP.restart();
+}
+
+void configCamera() {
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
@@ -43,7 +55,7 @@ void configCamera(camera_fb_t * fb) {
   config.pin_sscb_scl = SIOC_GPIO_NUM;
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 20000000;
+  config.xclk_freq_hz = 10000000;
   config.pixel_format = PIXFORMAT_JPEG;
 
   // init with high specs to pre-allocate larger buffers
@@ -61,18 +73,19 @@ void configCamera(camera_fb_t * fb) {
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
     Serial.printf("Camera init failed with error 0x%x", err);
-    delay(1000);
-    ESP.restart();
+    espRestart();
   }
   sensor_t * s = esp_camera_sensor_get();
 
   Serial.print("Setting up camera device");
   for (int i = 0; i < 3; i ++) {
-    fb = esp_camera_fb_get();
+    camera_fb_t * configfb = esp_camera_fb_get();
     delay(1000);
-    esp_camera_fb_return(fb);
+    esp_camera_fb_return(configfb);
     Serial.print(".");
   }
 
   Serial.println(" Camera successfully configured");
 }
+
+#endif

@@ -1,13 +1,17 @@
 #include <TimeLib.h>
 #include <Arduino.h>
 #include <secrets.h>
+#include <camera.h>
+
+#ifndef TIMING_H
+#define TIMING_H
 
 unsigned long getTime() {
   time_t now;
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo)) {
     Serial.println("Failed to obtain time");
-    ESP.restart();
+    espRestart();
   }
   time(&now);
   return now;
@@ -38,7 +42,7 @@ unsigned long getCurrentHour() {
 
   if(!getLocalTime(&timeinfo)){
     Serial.println("Failed to obtain time");
-    ESP.restart();
+    espRestart();
   }
 
   char timeHour[3];
@@ -61,7 +65,7 @@ void waitAndReboot(long timeToMonitor) {
   while (timeToMonitor - currentHour > REBOOT_SAFETY_MARGIN)
     currentHour = getCurrentHour();
 
-  ESP.restart();
+  espRestart();
 }
 
 void verifyReboot() {
@@ -91,3 +95,5 @@ void verifyWorkingHours() {
     deep_sleep(WORKING_HOUR_SLEEP * MICRO_TO_SECONDS);
   }
 }
+
+#endif

@@ -11,46 +11,46 @@ String getObjectName() {
   return objName;
 }
 
+
 void setup() {
   Serial.begin(115200);
+  printHeap();
   connectWifi();
   connectAWS();
   syncTime();
-  configCamera(fb);
+  configCamera();
+  printHeap();
 }
 
 void loop() {
+  Serial.println("Entering outter loop");
   long millisnow = millis();
   if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("Entering inner loop");
     verifyWorkingHours();
+    Serial.println("Verified working hours");
 
     verifyReboot();
+    Serial.println("Reboot necessity verified");
 
     if (!client.connected())
       connectAWS();
-
-    String objName = getObjectName();
-    fb = esp_camera_fb_get();
-
-    if (!fb) {
-      Serial.println("Camera capture failed");
-      delay(1000);
-      return;
-    }
     
+    Serial.println("Initiating camera");
+    String objName = getObjectName();
+    printHeap();
+
     publishURLRequest(objName);
     
-    while (!RECEIVED_POST_URL)
+    while (!RECEIVED_POST_URL){
       client.loop();
+    }
 
     RECEIVED_POST_URL = false;
 
   }
 
-  else {
-    Serial.println("Lost communication. Reconnecting...");
-  }
-
   long timeDelay = millis() - millisnow;
+
   deep_sleep(SLEEP_TIME * MICRO_TO_SECONDS - timeDelay * MICRO_TO_MILLI);
 }

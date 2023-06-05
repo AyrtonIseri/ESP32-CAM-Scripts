@@ -5,15 +5,20 @@
 #include <HTTPClient.h>
 #include <ESP_WiFiManager.h>
 #include <WiFiClientSecure.h>
-#include <camera.h>
+
+#ifndef CONNECTION_H
+#define CONNECTION_H
 
 WiFiClientSecure net = WiFiClientSecure();
 MQTTClient client = MQTTClient(MQTT_BUF_SIZE);
 
 bool RECEIVED_POST_URL = false;
 
+void rebootLog(String messageError);
+
 void connectWifi() {
   ESP_WiFiManager ESP_wifiManager;
+  // ESP_wifiManager.resetSettings();
   if (!ESP_wifiManager.autoConnect(AP_SSID.c_str(), AP_PASS.c_str()))
     Serial.println(F("Not connected to WiFi but continuing anyway."));
   else
@@ -35,8 +40,11 @@ void uploadFileToS3(String uploadUrl, camera_fb_t* fb) {
     delay(1000);
     result = http.PUT(fb->buf, fb->len);
     tries += 1;
-    if (tries > 5)
-      ESP.restart();
+    if (tries > 10){
+      rebootLog("Couldn't put request the file after 10 tries. Rebooting!");
+      http.end();
+      espRestart();
+    }
   }
 
   Serial.print("The result from the post operation was: ");
@@ -61,11 +69,43 @@ void messageHandler(String &topic, String &payload) {
     return;
   }
 
+  camera_fb_t* fb = esp_camera_fb_get();
+  Serial.println("Photo taken and stored");
+  printHeap();
+
+  if (!fb) {
+    Serial.println("Camera capture failed");
+    printHeap();
+    rebootLog("Couldn't take picture, rebooting system!");
+    esp_camera_fb_return(fb);
+    espRestart();
+  }
+
   uploadFileToS3(url["url"], fb);
   
   esp_camera_fb_return(fb);
-  delay(100);
-  esp_camera_fb_return(fb);
+  printHeap();
+}
+
+void sendLogStatus() {
+  StaticJsonDocument<200> doc;
+  doc["status"] = "Connected";
+  doc["device"] = THINGNAME;
+
+  char jsonBuffer[512];
+  serializeJson(doc, jsonBuffer);
+
+  if (WiFi.status() != WL_CONNECTED)
+    connectWifi();
+
+  while(!client.publish(AWS_IOT_LOGS_TOPIC, jsonBuffer)) {
+    Serial.println("\nCouldn't log the operation, skipping log part");
+    client.loop();
+
+    if (!client.connected())
+      return;
+
+  }
 }
 
 void connectAWS() {
@@ -79,9 +119,13 @@ void connectAWS() {
 
   Serial.print("Connecting to AWS IOT");
 
+  int tries = 0;
   while (!client.connect(THINGNAME)) {
     Serial.print(".");
-    delay(100);
+    delay(200);
+    tries += 1;
+    if (tries > 100)
+      espRestart();
   }
 
     if(!client.connected()){
@@ -92,7 +136,9 @@ void connectAWS() {
   // Subscribe to a topic
   client.subscribe(AWS_IOT_SUBSCRIBE_TOPIC);
 
-  Serial.println("\nAWS IoT Connected!\n");
+  sendLogStatus();
+
+  // Serial.println("\nAWS IoT Connected!\n");
 }
 
 void publishURLRequest(String objName) {
@@ -110,13 +156,45 @@ void publishURLRequest(String objName) {
   if (WiFi.status() != WL_CONNECTED)
     connectWifi();
 
+  int tries = 0;
   while(!client.publish(AWS_IOT_PUBLISH_TOPIC, jsonBuffer)) {
     Serial.println("Couldn't publish the request, trying again");
+    rebootLog("Couldn't publish the request, trying again");
     delay(1000);
     client.loop();
     if (!client.connected())
       connectAWS();
+    tries += 1;
+    if (tries > 30)
+      espRestart();
   }
 
   Serial.print("MQTT message successfully sent.");
 }
+
+void rebootLog(String messageError) {
+  StaticJsonDocument<200> doc;
+  doc["status"] = "Rebooting";
+  doc["device"] = THINGNAME;
+  doc["message"] = messageError;
+
+  char jsonBuffer[512];
+  serializeJson(doc, jsonBuffer);
+
+  if (WiFi.status() != WL_CONNECTED)
+    connectWifi();
+  
+  int tries = 1;
+  while(!client.publish(AWS_IOT_LOGS_TOPIC, jsonBuffer)) {
+    client.loop();
+
+    if (!client.connected())
+      connectAWS();
+    
+    tries += 1;
+    if (tries > 30)
+      espRestart();
+  }
+}
+
+#endif
