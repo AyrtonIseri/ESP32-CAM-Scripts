@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <secrets.h>
 #include "esp_camera.h"
+#include <utils.h>
 
 #ifndef CAMERA_H
 #define CAMERA_H
@@ -23,17 +24,6 @@
 #define VSYNC_GPIO_NUM    25
 #define HREF_GPIO_NUM     23
 #define PCLK_GPIO_NUM     22
-
-void printHeap() {
-  Serial.print("Current Heap free space: ");
-  Serial.println(ESP.getFreeHeap());
-}
-
-void espRestart() {
-  delay(1000);
-  Serial.flush();
-  ESP.restart();
-}
 
 void configCamera() {
   camera_config_t config;

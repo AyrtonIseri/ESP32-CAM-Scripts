@@ -75,7 +75,6 @@ void messageHandler(String &topic, String &payload) {
 
   if (!fb) {
     Serial.println("Camera capture failed");
-    printHeap();
     rebootLog("Couldn't take picture, rebooting system!");
     esp_camera_fb_return(fb);
     espRestart();
@@ -84,7 +83,6 @@ void messageHandler(String &topic, String &payload) {
   uploadFileToS3(url["url"], fb);
   
   esp_camera_fb_return(fb);
-  printHeap();
 }
 
 void sendLogStatus() {
@@ -127,9 +125,11 @@ void connectAWS() {
     if (tries > 100)
       espRestart();
   }
-
-    if(!client.connected()){
-    Serial.println("AWS IoT Timeout!");
+  
+  Serial.print("\n");
+  
+  if(!client.connected()){
+    Serial.println("\nAWS IoT Timeout!");
     return;
   }
 
@@ -169,7 +169,7 @@ void publishURLRequest(String objName) {
       espRestart();
   }
 
-  Serial.print("MQTT message successfully sent.");
+  Serial.println("MQTT message successfully sent.");
 }
 
 void rebootLog(String messageError) {

@@ -14,31 +14,23 @@ String getObjectName() {
 
 void setup() {
   Serial.begin(115200);
-  printHeap();
   connectWifi();
   connectAWS();
   syncTime();
   configCamera();
-  printHeap();
 }
 
 void loop() {
-  Serial.println("Entering outter loop");
   long millisnow = millis();
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("Entering inner loop");
     verifyWorkingHours();
-    Serial.println("Verified working hours");
 
     verifyReboot();
-    Serial.println("Reboot necessity verified");
 
     if (!client.connected())
       connectAWS();
     
-    Serial.println("Initiating camera");
     String objName = getObjectName();
-    printHeap();
 
     publishURLRequest(objName);
     
