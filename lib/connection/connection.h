@@ -5,6 +5,7 @@
 #include <HTTPClient.h>
 #include <ESP_WiFiManager.h>
 #include <WiFiClientSecure.h>
+#include <errors.h>
 
 #ifndef CONNECTION_H
 #define CONNECTION_H
@@ -14,7 +15,7 @@ MQTTClient client = MQTTClient(MQTT_BUF_SIZE);
 
 bool RECEIVED_POST_URL = false;
 
-void rebootLog(String messageError);
+void publishMessage(String topic, char * payload);
 
 void connectWifi() {
   ESP_WiFiManager ESP_wifiManager;
@@ -28,6 +29,7 @@ void connectWifi() {
 void uploadFileToS3(String uploadUrl, camera_fb_t* fb) {
   HTTPClient http;
   http.begin(uploadUrl);
+  http.setConnectTimeout(HTTP_CONNECT_TIMEOUT * SECONDS_TO_MILLI);
 
   Serial.print("payload size: ");
   Serial.print(fb->len);
@@ -38,13 +40,29 @@ void uploadFileToS3(String uploadUrl, camera_fb_t* fb) {
 
   while (result < 0){
     delay(1000);
+
     result = http.PUT(fb->buf, fb->len);
+    Serial.print("Current HTTP status: ");
+    Serial.println(http.connected());
+
     tries += 1;
     if (tries > 10){
-      rebootLog("Couldn't put request the file after 10 tries. Rebooting!");
+      Serial.println("Couldn't PUT request the file. Rebooting");
+
+      String messageError = "Camera device couldn't PUT request the file to the cloud. \n Current HTTP connection status: " + String(http.connected());      
+      baseError * cError = httpError(messageError);
+      char * jsonBuffer = getErrorLog(cError);
+
+      String errorTopic = DEFAULT_ERROR_TOPIC + cError->errorType;
+      publishMessage(errorTopic, jsonBuffer);
+
+      delete cError;
+      delete[] jsonBuffer;
+
       http.end();
       espRestart();
     }
+
   }
 
   Serial.print("The result from the post operation was: ");
@@ -71,39 +89,27 @@ void messageHandler(String &topic, String &payload) {
 
   camera_fb_t* fb = esp_camera_fb_get();
   Serial.println("Photo taken and stored");
-  printHeap();
 
   if (!fb) {
-    Serial.println("Camera capture failed");
-    rebootLog("Couldn't take picture, rebooting system!");
+    Serial.println("Camera capture failed! Rebooting");
+
+    String messageError = "Camera capture has failed and the device will restart. Current heap level: " + String(ESP.getFreeHeap());
+    baseError * cError = cameraError(messageError);
+    char * jsonBuffer = getErrorLog(cError);
+
+    String errorTopic = DEFAULT_ERROR_TOPIC + cError->errorType;
+    publishMessage(errorTopic, jsonBuffer);
+
+    delete cError;
+    delete[] jsonBuffer;
+
     esp_camera_fb_return(fb);
     espRestart();
   }
 
   uploadFileToS3(url["url"], fb);
-  
+
   esp_camera_fb_return(fb);
-}
-
-void sendLogStatus() {
-  StaticJsonDocument<200> doc;
-  doc["status"] = "Connected";
-  doc["device"] = THINGNAME;
-
-  char jsonBuffer[512];
-  serializeJson(doc, jsonBuffer);
-
-  if (WiFi.status() != WL_CONNECTED)
-    connectWifi();
-
-  while(!client.publish(AWS_IOT_LOGS_TOPIC, jsonBuffer)) {
-    Serial.println("\nCouldn't log the operation, skipping log part");
-    client.loop();
-
-    if (!client.connected())
-      return;
-
-  }
 }
 
 void connectAWS() {
@@ -135,10 +141,6 @@ void connectAWS() {
 
   // Subscribe to a topic
   client.subscribe(AWS_IOT_SUBSCRIBE_TOPIC);
-
-  sendLogStatus();
-
-  // Serial.println("\nAWS IoT Connected!\n");
 }
 
 void publishURLRequest(String objName) {
@@ -153,45 +155,27 @@ void publishURLRequest(String objName) {
   Serial.print("PUT request to upload the following file: ");
   Serial.println(objName);
 
-  if (WiFi.status() != WL_CONNECTED)
-    connectWifi();
-
-  int tries = 0;
-  while(!client.publish(AWS_IOT_PUBLISH_TOPIC, jsonBuffer)) {
-    Serial.println("Couldn't publish the request, trying again");
-    rebootLog("Couldn't publish the request, trying again");
-    delay(1000);
-    client.loop();
-    if (!client.connected())
-      connectAWS();
-    tries += 1;
-    if (tries > 30)
-      espRestart();
-  }
+  publishMessage(AWS_IOT_PUBLISH_TOPIC, jsonBuffer);
 
   Serial.println("MQTT message successfully sent.");
 }
 
-void rebootLog(String messageError) {
-  StaticJsonDocument<200> doc;
-  doc["status"] = "Rebooting";
-  doc["device"] = THINGNAME;
-  doc["message"] = messageError;
-
-  char jsonBuffer[512];
-  serializeJson(doc, jsonBuffer);
-
+void publishMessage(String topic, char * payload) {
   if (WiFi.status() != WL_CONNECTED)
     connectWifi();
-  
-  int tries = 1;
-  while(!client.publish(AWS_IOT_LOGS_TOPIC, jsonBuffer)) {
-    client.loop();
 
+  int tries = 0;
+  while(!client.publish(topic, payload)) {
+
+    Serial.println("Couldn't publish the request, trying again");
+    delay(1000);
+    client.loop();
+    
     if (!client.connected())
       connectAWS();
-    
+
     tries += 1;
+
     if (tries > 30)
       espRestart();
   }

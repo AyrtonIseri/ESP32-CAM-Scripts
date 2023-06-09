@@ -2,6 +2,7 @@
 #include <secrets.h>
 #include "esp_camera.h"
 #include <utils.h>
+#include <errors.h>
 
 #ifndef CAMERA_H
 #define CAMERA_H
@@ -63,6 +64,17 @@ void configCamera() {
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
     Serial.printf("Camera init failed with error 0x%x", err);
+
+    String messageError = "Camera device couldn't be initiated. Error code returned was: 0x" + String(err);      
+    baseError * cError = cameraConfigError(messageError);
+    char * jsonBuffer = getErrorLog(cError);
+
+    String errorTopic = DEFAULT_ERROR_TOPIC + cError->errorType;
+    publishMessage(errorTopic, jsonBuffer);
+  
+    delete cError;
+    delete[] jsonBuffer;
+
     espRestart();
   }
   sensor_t * s = esp_camera_sensor_get();

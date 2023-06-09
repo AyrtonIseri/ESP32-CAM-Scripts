@@ -10,7 +10,7 @@ String getObjectName() {
 
   return objName;
 }
-
+// Adicionar um outro log para o camera probe failed!!!!!!!!!!!!!!!!!!!!!! Assim como no PUT request e no capture taken
 
 void setup() {
   Serial.begin(115200);
@@ -34,8 +34,11 @@ void loop() {
 
     publishURLRequest(objName);
     
+    long millis_to_received = millis();
     while (!RECEIVED_POST_URL){
       client.loop();
+      if (millis() - millis_to_received > SLEEP_TIME * SECONDS_TO_MILLI)
+        espRestart();
     }
 
     RECEIVED_POST_URL = false;
@@ -43,6 +46,5 @@ void loop() {
   }
 
   long timeDelay = millis() - millisnow;
-
   deep_sleep(SLEEP_TIME * MICRO_TO_SECONDS - timeDelay * MICRO_TO_MILLI);
 }
