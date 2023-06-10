@@ -1,16 +1,31 @@
 #include <Arduino.h>
 #include <secrets.h>
 #include <connection.h>
+#include <camera.h>
 
-String getObjectName() {
+String getFileTitle() {
   time_t currTimestamp = getTime();
   String strTimestamp = String(currTimestamp);
 
-  String objName = THINGNAME + String("-") + strTimestamp + String(".png");
-
-  return objName;
+  String fileName = THINGNAME + String("-") + strTimestamp + String(".png");
+  return fileName;
 }
-// Adicionar um outro log para o camera probe failed!!!!!!!!!!!!!!!!!!!!!! Assim como no PUT request e no capture taken
+
+void loopMQTTAndRestartIfTimeout(long timeSinceWaitingBegan) {
+    client.loop();
+
+    long elapsedTime = millis() - timeSinceWaitingBegan; //milliseconds
+    long waitingTimeout = SLEEP_TIME * SECONDS_TO_MILLI; //milliseconds
+
+    if (elapsedTime > waitingTimeout)
+      espRestart();
+}
+
+void listenForURL(){
+  long timeSinceWaitingBegan = millis();
+  while (!RECEIVED_POST_URL)
+    loopMQTTAndRestartIfTimeout(timeSinceWaitingBegan);
+}
 
 void setup() {
   Serial.begin(115200);
@@ -24,27 +39,16 @@ void loop() {
   long millisnow = millis();
   if (WiFi.status() == WL_CONNECTED) {
     verifyWorkingHours();
-
     verifyReboot();
 
     if (!client.connected())
       connectAWS();
     
-    String objName = getObjectName();
-
-    publishURLRequest(objName);
-    
-    long millis_to_received = millis();
-    while (!RECEIVED_POST_URL){
-      client.loop();
-      if (millis() - millis_to_received > SLEEP_TIME * SECONDS_TO_MILLI)
-        espRestart();
-    }
-
-    RECEIVED_POST_URL = false;
-
+    String fileTitle = getFileTitle();
+    publishURLRequest(fileTitle);
+    listenForURL();
   }
 
-  long timeDelay = millis() - millisnow;
-  deep_sleep(SLEEP_TIME * MICRO_TO_SECONDS - timeDelay * MICRO_TO_MILLI);
+  long timeDelayDueToExecution = millis() - millisnow;
+  deep_sleep(SLEEP_TIME * MICRO_TO_SECONDS - timeDelayDueToExecution * MICRO_TO_MILLI);
 }
