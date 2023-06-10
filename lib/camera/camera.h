@@ -3,6 +3,7 @@
 #include "esp_camera.h"
 #include <utils.h>
 #include <errors.h>
+#include <connection.h>
 
 #ifndef CAMERA_H
 #define CAMERA_H

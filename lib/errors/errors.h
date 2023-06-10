@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <secrets.h>
 #include <ArduinoJson.h>
+#include <timing.h>
 
 #ifndef ERROR_H
 #define ERROR_H
@@ -33,10 +34,9 @@ baseError * cameraConfigError(String errorMessage){
 
 char * getErrorLog(baseError * error) {
     StaticJsonDocument<600> doc;
-    doc["device"] = THINGNAME;
     doc["error type"] = error->errorType;
     doc["message"] = error->errorMessage;
-
+    doc["datestamp"] = getTime();
 
     size_t bufferSize = measureJson(doc) + 1;
     char* jsonBuffer = new char[bufferSize];

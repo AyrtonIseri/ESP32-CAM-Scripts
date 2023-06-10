@@ -1,7 +1,7 @@
 #include <TimeLib.h>
 #include <Arduino.h>
 #include <secrets.h>
-#include <camera.h>
+#include <utils.h>
 
 #ifndef TIMING_H
 #define TIMING_H
