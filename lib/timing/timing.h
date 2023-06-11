@@ -84,11 +84,21 @@ void verifyReboot() {
 
 }
 
+bool isSleepyHour(unsigned long currentHour) {
+  return (currentHour < WORKING_HOURS[0] * 3600 || currentHour > WORKING_HOURS[1] * 3600);
+}
+
+bool isCloseToWakingUp(unsigned long currentHour) {
+  return (currentHour < WORKING_HOURS[1]*3600 && 
+  currentHour < WORKING_HOURS[0] && 
+  WORKING_HOURS[0] * 3600 - currentHour < WORKING_HOUR_SLEEP);
+}
+
 void verifyWorkingHours() {
   unsigned long currentHour = getCurrentHour();
-  if (currentHour < WORKING_HOURS[0] * 3600 || currentHour > WORKING_HOURS[1] * 3600) {
+  if (isSleepyHour(currentHour)) {
     
-    if (WORKING_HOURS[0]*3600 - currentHour < WORKING_HOUR_SLEEP)
+    if (isCloseToWakingUp(currentHour))
       waitAndReboot(WORKING_HOURS[0] * 3600);
 
     Serial.println("Current Period is not a working hour. Going to sleep");
