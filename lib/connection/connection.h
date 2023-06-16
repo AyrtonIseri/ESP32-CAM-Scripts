@@ -20,8 +20,9 @@ void publishMessage(String topic, char * payload);
 void connectWifi() {
   ESP_WiFiManager ESP_wifiManager;
   ESP_wifiManager.setConfigPortalTimeout(WIFI_MANAGER_CONFIG_MODE_TIMEOUT);
+  ESP_wifiManager.setConnectTimeout(WIFI_MANAGER_CONNECTION_TIMEOUT);
 
-  ESP_wifiManager.resetSettings();
+  // ESP_wifiManager.resetSettings();
   if (!ESP_wifiManager.autoConnect(AP_SSID.c_str(), AP_PASS.c_str())) {
     Serial.println(F("Access Point timedout and the device will reboot in order to try again."));
     espRestart();
