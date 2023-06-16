@@ -22,7 +22,7 @@ void espRestart() {
   delay(1000);
   Serial.flush();
   
-  ESP.restart();
+  deep_sleep(1000);
 }
 
 #endif
