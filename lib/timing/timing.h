@@ -17,15 +17,6 @@ unsigned long getTime() {
   return now;
 }
 
-void deep_sleep(long time_to_sleep) {
-  esp_sleep_enable_timer_wakeup(time_to_sleep);
-
-  Serial.println("Setup ESP32 to sleep for " + String(time_to_sleep / MICRO_TO_SECONDS) + " Seconds");
-  Serial.flush();
-
-  esp_deep_sleep_start();
-}
-
 void syncTime() {
   configTime(GMT_TIMEZONE_OFFSET * 3600, 0, "pool.ntp.org");
   Serial.print("Setting up adequate time");
