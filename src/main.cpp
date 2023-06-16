@@ -3,6 +3,8 @@
 #include <connection.h>
 #include <camera.h>
 
+long millisnow;
+
 String getFileTitle() {
   time_t currTimestamp = getTime();
   String strTimestamp = String(currTimestamp);
@@ -29,6 +31,8 @@ void listenForURL(){
 
 void setup() {
   Serial.begin(115200);
+  millisnow = millis();
+  delay(1000);
   connectWifi();
   connectAWS();
   syncTime();
@@ -36,7 +40,6 @@ void setup() {
 }
 
 void loop() {
-  long millisnow = millis();
   if (WiFi.status() == WL_CONNECTED) {
     verifyWorkingHours();
     verifyReboot();

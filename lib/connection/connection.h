@@ -45,6 +45,9 @@ void uploadFileToS3(String uploadUrl, camera_fb_t* fb) {
     Serial.print("Current HTTP status: ");
     Serial.println(http.connected());
 
+    if(WiFi.status() != WL_CONNECTED)
+      connectWifi();
+
     tries += 1;
     if (tries > 10){
       Serial.println("Couldn't PUT request the file. Rebooting");
