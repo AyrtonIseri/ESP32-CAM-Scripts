@@ -1,7 +1,9 @@
 #include <Arduino.h>
 #include <secrets.h>
-#include <connection.h>
 #include <camera.h>
+#include <connection.h>
+#include <timing.h>
+#include <utils.h>
 
 long millisnow;
 
