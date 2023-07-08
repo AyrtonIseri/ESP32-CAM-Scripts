@@ -4,8 +4,8 @@
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include <ESP_WiFiManager.h>
-#include <WiFiClientSecure.h>
 #include <errors.h>
+#include <WiFi.h>
 
 #ifndef CONNECTION_H
 #define CONNECTION_H
@@ -18,16 +18,20 @@ bool RECEIVED_POST_URL = false;
 void publishMessage(String topic, char * payload);
 
 void connectWifi() {
-  ESP_WiFiManager ESP_wifiManager;
-  ESP_wifiManager.setConfigPortalTimeout(WIFI_MANAGER_CONFIG_MODE_TIMEOUT);
+  unsigned long startTime = millis();
+  WiFi.begin(SSID, PASSWORD);
+  while (WiFi.status() != WL_CONNECTED) {
+    unsigned long currentTime = millis();
+    
+    if (currentTime - startTime > WIFI_CONNECTION_TIMEOUT * SECONDS_TO_MILLI)
+      espRestart();
 
-  // ESP_wifiManager.resetSettings();
-  if (!ESP_wifiManager.autoConnect(AP_SSID.c_str(), AP_PASS.c_str())) {
-    Serial.println(F("Access Point timedout and the device will reboot in order to try again."));
-    espRestart();
+    Serial.println("Couldn't establish connetion. Retrying...");
+    delay(500);
   }
-  else
-    Serial.println(F("\nWiFi connected...yeey :)\n"));
+
+  Serial.println("Wifi Connected");
+
 }
 
 void uploadFileToS3(String uploadUrl, camera_fb_t* fb) {
