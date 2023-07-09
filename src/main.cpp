@@ -43,7 +43,7 @@ void setup() {
 
 void loop() {
   if (WiFi.status() == WL_CONNECTED) {
-    verifyWorkingHours();
+    // verifyWorkingHours();
     verifyReboot();
 
     if (!client.connected())
