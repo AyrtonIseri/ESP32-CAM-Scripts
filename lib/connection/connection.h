@@ -2,7 +2,7 @@
 #include "esp_camera.h"
 #include <MQTTClient.h>
 #include <WiFi.h>
-#include <HTTPClient.h>
+#include "HTTPClient.h"
 
 
 #ifndef CONNECTION_H

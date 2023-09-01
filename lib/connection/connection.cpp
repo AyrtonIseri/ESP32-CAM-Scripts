@@ -25,9 +25,9 @@ void connectWifi() {
     unsigned long currentTime = millis();
     
     if (currentTime - startTime > WIFI_CONNECTION_TIMEOUT * SECONDS_TO_MILLI)
-      espRestart();
+      deep_sleep(WIFI_CONNECTION_TIMEOUT_SLEEP * MICRO_TO_SECONDS);
 
-    Serial.println("Couldn't establish connetion. Retrying...");
+    Serial.println("Couldn't establish connection. Retrying...");
     delay(500);
   }
 
